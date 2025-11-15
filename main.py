@@ -2,9 +2,18 @@ import torch.optim as optim
 from net.network import SwinJSCC
 from data.datasets import get_loader
 from utils import *
-
-# torch.backends.cudnn.benchmark = True
+import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import warnings
+# torch.backends.cudnn.benchmark = True
+# 在文件开头添加这些行（import torch 之前）
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['PYTHONWARNINGS'] = 'ignore'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import logging
+logging.getLogger().setLevel(logging.ERROR)
+warnings.filterwarnings('ignore')
 import torch
 from datetime import datetime
 import torch.nn as nn
@@ -34,7 +43,8 @@ class config():
     seed = 42
     pass_channel = True
     CUDA = True
-    device = torch.device("cuda:0")
+    # device = torch.device("cuda:0")
+    device = torch.device("cuda")
     norm = False
     # logger
     print_step = 100
@@ -49,13 +59,13 @@ class config():
     # training details
     normalize = False
     learning_rate = 0.0001
-    tot_epoch = 10000000
+    tot_epoch = 1000
 
     if args.trainset == 'CIFAR10':
         save_model_freq = 5
         image_dims = (3, 32, 32)
-        train_data_dir = "/media/D/Dataset/CIFAR10/"
-        test_data_dir = "/media/D/Dataset/CIFAR10/"
+        train_data_dir = "/mnt/nfs/jcliu/wp/sj/datasets/CIFAR10/"
+        test_data_dir = "/mnt/nfs/jcliu/wp/sj/datasets/CIFAR10/"
         batch_size = 128
         downsample = 2
         channel_number = int(args.C)
@@ -92,17 +102,32 @@ class config():
     elif args.trainset == 'DIV2K':
         save_model_freq = 100
         image_dims = (3, 256, 256)
-        base_path = "/media/D/Dataset/DIV2K/"
+        base_path = "/mnt/nfs/jcliu/wp/sj/datasets/DIV2K"
         if args.testset == 'kodak':
-            test_data_dir = ["/media/D/Dataset/test/Kodak/"]
-        elif args.testset == 'CLIC21':
-            test_data_dir = ["/media/D/Dataset/HR_Image_dataset/clic2021/test/"]
-        elif args.testset == 'ffhq':
-            test_data_dir = ["/media/D/yangke/SwinJSCC/data/ffhq/"]
+            test_data_dir = ["/mnt/nfs/jcliu/wp/sj/datasets/Kodak/"]
+        # 暂无这些数据集
+        # elif args.testset == 'CLIC21':# 暂无
+        #     test_data_dir = ["/media/D/Dataset/HR_Image_dataset/clic2021/test/"]
+        # elif args.testset == 'ffhq':# 暂无
+        #     test_data_dir = ["/media/D/yangke/SwinJSCC/data/ffhq/"]
 
+        # 没有训练数据集的时候
+        # train_data_dir = test_data_dir  # ← 添加这一行
+
+
+        # 把这些目录下的图像全都当作训练集
         train_data_dir = [
-            base_path + '/clic2020/**', base_path + '/clic2021/train', base_path + '/clic2021/valid', base_path + '/clic2022/val', base_path + '/DIV2K_train_HR', base_path + '/DIV2K_valid_HR'
+            base_path + '/clic2020/train',      # CLIC2020 训练集 (585张)
+            base_path + '/clic2020/valid',      # CLIC2020 验证集 (41张)
+            # 注意：原代码期望 clic2020/**，但您的结构是 clic2020/train 和 clic2020/valid
+            # 如果您还有其他CLIC数据集，按实际路径添加：
+            # base_path + '/clic2021/train',
+            # base_path + '/clic2021/valid',
+            # base_path + '/clic2022/val',
+            base_path + '/DIV2K_train_HR/DIV2K_train_HR',  # DIV2K 训练集 (800张)
+            base_path + '/DIV2K_valid_HR/DIV2K_valid_HR',  # DIV2K 验证集 (100张)
         ]
+
         batch_size = 16
         downsample = 4
         if args.model == 'SwinJSCC_w/o_SAandRA' or args.model == 'SwinJSCC_w/_SA':
@@ -385,7 +410,7 @@ if __name__ == '__main__':
     logger.info(config.__dict__)
     torch.manual_seed(seed=config.seed)
     net = SwinJSCC(args, config)
-    model_path = "./checkpoint/SwinJSCC_w_SAandRA_AWGN_HRimage_cbr_psnr_snr.model"
+    model_path = "./checkpoint/main_model.model"
     load_weights(model_path)
     net = net.cuda()
     model_params = [{'params': net.parameters(), 'lr': 0.0001}]
